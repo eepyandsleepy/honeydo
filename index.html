@@ -21,6 +21,10 @@
     .hive-scroll::-webkit-scrollbar-thumb { background: #E8C84A; border-radius: 4px; }
     .hive-scroll::-webkit-scrollbar-thumb:hover { background: #C4956A; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(18px);} to { opacity:1; transform:translateY(0);} }
+    .hive-scroll svg * { -webkit-user-select: none; user-select: none; }
+    .hive-scroll svg { -webkit-touch-callout: none; -webkit-user-select: none; }
+    svg { -webkit-touch-callout: none !important; -webkit-user-select: none !important; user-select: none !important; }
+    svg * { -webkit-touch-callout: none !important; -webkit-user-select: none !important; user-select: none !important; }
   </style>
 </head>
 <body>
@@ -1029,14 +1033,15 @@ function HexTask({ task, cx, cy, size, dragging }) {
       onMouseLeave={() => setHov(false)}
       style={{
         transformOrigin: `${cx}px ${cy}px`,
-        transform: dragging ? "scale(1.15) rotate(2deg)" : hov ? "scale(1.06)" : "scale(1)",
-        transition: dragging ? "none" : "transform 0.15s cubic-bezier(0.34,1.56,0.64,1)",
+        transform: hov && !dragging ? "scale(1.06)" : "scale(1)",
+        transition: dragging ? "none" : "transform 0.15s ease",
         filter: dragging
-          ? "drop-shadow(0 14px 28px rgba(160,120,0,0.30))"
+          ? "drop-shadow(0 10px 20px rgba(160,120,0,0.25))"
           : hov
           ? "drop-shadow(0 5px 12px rgba(160,120,0,0.18))"
           : "drop-shadow(0 2px 6px rgba(0,0,0,0.07))",
         cursor: dragging ? "grabbing" : "pointer",
+        opacity: dragging ? 0.92 : 1,
       }}
     >
       {/* Hex fill — uses task.color if set */}
@@ -2325,8 +2330,8 @@ function getWeekKey() {
   return mon.toISOString().slice(0, 10);
 }
 
-function HoneyDo({ userId, onSignOut }) {
-  const load = (k, d) => { if (window.hdLoad) return window.hdLoad(k, d); try { const l = localStorage.getItem(k); return l ? JSON.parse(l) : d; } catch { return d; } };
+export default function HoneyDo() {
+  const load = (k, d) => { if (window.hdPreloaded && window.hdPreloaded.hasOwnProperty(k)) return window.hdPreloaded[k] ?? d; try { const l = localStorage.getItem(k); return l ? JSON.parse(l) : d; } catch { return d; } };
 
   const [tasks,       setTasks]      = useState(() => load("hd4-tasks",    []));
   const [hives,       setHives]      = useState(() => {
@@ -2606,7 +2611,7 @@ function HoneyDo({ userId, onSignOut }) {
         try { ds.element.setPointerCapture(ds.pointerId); } catch(err) {}
         ds.id = ds.pendingId;
         setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
-      }, 280);
+      }, 150);
     }
   };
 
@@ -2650,7 +2655,14 @@ function HoneyDo({ userId, onSignOut }) {
     ds.snapCol = snap.col;
     ds.snapRow = snap.row;
 
-    setDragRender({ id: ds.id, ghostX, ghostY, snapCol: snap.col, snapRow: snap.row });
+    if (!ds.rafPending) {
+      ds.rafPending = true;
+      requestAnimationFrame(() => {
+        ds.rafPending = false;
+        if (!ds.id) return;
+        setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
+      });
+    }
   };
 
   const onPointerUp = e => {
@@ -2810,11 +2822,6 @@ function HoneyDo({ userId, onSignOut }) {
                 padding: "6px 14px", cursor: "pointer",
                 fontFamily: "'Jost',sans-serif", fontWeight: 600, fontSize: 13, color: BROWN
               }}>Focus</button>}
-              {!isMobile && <button onClick={onSignOut} style={{
-                background: "transparent", border: "1.5px solid #E8D0A0", borderRadius: 12,
-                padding: "6px 12px", cursor: "pointer",
-                fontFamily: "'Jost',sans-serif", fontWeight: 600, fontSize: 12, color: "#C4956A"
-              }}>Sign out</button>}
 
               {!isMobile && <div style={{ display: "flex", background: HEX_COLOR, borderRadius: 12, padding: 3, border: "1.5px solid #E8D84A" }}>
                 {[["hive","Hive"],["list","List"],["garden","Garden"]].map(([v,label]) => (
@@ -3224,7 +3231,7 @@ function HoneyDo({ userId, onSignOut }) {
                           stroke={GOLD}
                           strokeWidth="2.5"
                           strokeDasharray="7 5"
-                          style={{ animation: "snapPulse 0.7s ease-in-out infinite", pointerEvents: "none" }}
+                          style={{ pointerEvents: "none", opacity: 0.7 }}
                         />
                       );
                     })()}
@@ -3426,10 +3433,8 @@ function HoneyDo({ userId, onSignOut }) {
   );
 }
 
-    // ── Sign out button injected into HoneyDo via prop ───────────────────────
-    // (handled inside the header — see onSignOut prop usage below)
-
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    let _mounted = false;
+    function mount() { if (_mounted) return; _mounted = true; ReactDOM.createRoot(document.getElementById("root")).render(<App />); }
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Playfair+Display:wght@600&family=Jost:wght@400;600;700&display=swap" rel="stylesheet"/>
 </body>
