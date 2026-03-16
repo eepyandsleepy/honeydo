@@ -2573,7 +2573,6 @@ function HoneyDo({ userId, onSignOut }) {
   const longPressTimer = useRef(null);
 
   const onPointerDown = (e, taskId) => {
-    e.stopPropagation();
     const isTouch = e.pointerType === "touch";
 
     const svg  = svgRef.current;
@@ -2583,8 +2582,8 @@ function HoneyDo({ userId, onSignOut }) {
     const pos  = positions[taskId] || { col: 0, row: 0 };
     const { x: cx, y: cy } = cellCenter(pos.col, pos.row);
 
-    dragState.current = {
-      id: isTouch ? null : taskId,   // desktop: active immediately; mobile: wait for long press
+    const state = {
+      id: isTouch ? null : taskId,
       pendingId: isTouch ? taskId : null,
       pointerId: e.pointerId,
       element: e.currentTarget,
@@ -2594,14 +2593,14 @@ function HoneyDo({ userId, onSignOut }) {
       startScreenX: e.clientX, startScreenY: e.clientY,
       hasMoved: false,
     };
+    dragState.current = state;
 
     if (!isTouch) {
-      // Desktop: instant drag
       e.preventDefault();
+      e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
       setDragRender({ id: taskId, ghostX: cx, ghostY: cy, snapCol: pos.col, snapRow: pos.row });
     } else {
-      // Mobile: long press to distinguish drag vs scroll
       clearTimeout(longPressTimer.current);
       longPressTimer.current = setTimeout(() => {
         const ds = dragState.current;
@@ -2616,24 +2615,22 @@ function HoneyDo({ userId, onSignOut }) {
   const onPointerMove = e => {
     const ds = dragState.current;
 
-    // Track movement during long-press wait — cancel if user is scrolling
     if (ds.pendingId && !ds.id) {
       const dx = e.clientX - ds.startScreenX;
       const dy = e.clientY - ds.startScreenY;
-      if (Math.hypot(dx, dy) > 8) {
-        ds.hasMoved = true;
-        clearTimeout(longPressTimer.current);
-      }
+      if (Math.hypot(dx, dy) > 8) { ds.hasMoved = true; clearTimeout(longPressTimer.current); }
       return;
     }
 
     if (!ds.id) return;
     e.preventDefault();
 
-    const svg  = svgRef.current;
-    const rect = svg.getBoundingClientRect();
-    const px   = (e.clientX - rect.left) * (SVG_W / rect.width);
-    const py   = (e.clientY - rect.top)  * (SVG_H / rect.height);
+    const svg   = svgRef.current;
+    const rect  = svg.getBoundingClientRect();
+    const scaleX = SVG_W / rect.width;
+    const scaleY = SVG_H / rect.height;
+    const px = (e.clientX - rect.left) * scaleX;
+    const py = (e.clientY - rect.top)  * scaleY;
 
     const ghostX = px - ds.offX;
     const ghostY = py - ds.offY;
@@ -2643,7 +2640,7 @@ function HoneyDo({ userId, onSignOut }) {
     if (Math.hypot(dx, dy) > 6) ds.hasMoved = true;
 
     const occ  = buildOccMap(ds.id);
-    const snap = nearestCell(ghostX, ghostY, occ, ds.id, GRID_COLS, GRID_ROWS);
+    const snap = nearestCell(ghostX, ghostY, occ, ds.id);
 
     ds.ghostX  = ghostX;
     ds.ghostY  = ghostY;
@@ -2658,15 +2655,14 @@ function HoneyDo({ userId, onSignOut }) {
     const ds = dragState.current;
 
     if (ds.pendingId && !ds.id && !ds.hasMoved) {
-      // Short tap on mobile — open popup
-      const px = Math.min(e.clientX + 12, window.innerWidth - 280);
-      const py = Math.max(10, e.clientY - 10);
-      setPopup({ taskId: ds.pendingId, screenX: px, screenY: py });
+      const spx = Math.min(e.clientX + 12, window.innerWidth - 280);
+      const spy = Math.max(10, e.clientY - 10);
+      setPopup({ taskId: ds.pendingId, screenX: spx, screenY: spy });
     } else if (ds.id) {
       if (!ds.hasMoved) {
-        const px = Math.min(e.clientX + 12, window.innerWidth - 280);
-        const py = Math.max(10, e.clientY - 10);
-        setPopup({ taskId: ds.id, screenX: px, screenY: py });
+        const spx = Math.min(e.clientX + 12, window.innerWidth - 280);
+        const spy = Math.max(10, e.clientY - 10);
+        setPopup({ taskId: ds.id, screenX: spx, screenY: spy });
       } else {
         setPositions(p => ({ ...p, [ds.id]: { col: ds.snapCol, row: ds.snapRow } }));
       }
