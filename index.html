@@ -2331,7 +2331,7 @@ function getWeekKey() {
 }
 
 function HoneyDo({ userId, onSignOut }) {
-  const load = (k, d) => { if (window.hdPreloaded && window.hdPreloaded.hasOwnProperty(k)) return window.hdPreloaded[k] ?? d; try { const l = localStorage.getItem(k); return l ? JSON.parse(l) : d; } catch { return d; } };
+  const load = (k, d) => { if (window.hdLoad) return window.hdLoad(k, d); try { const l = localStorage.getItem(k); return l ? JSON.parse(l) : d; } catch { return d; } };
 
   const [tasks,       setTasks]      = useState(() => load("hd4-tasks",    []));
   const [hives,       setHives]      = useState(() => {
@@ -2628,7 +2628,7 @@ function HoneyDo({ userId, onSignOut }) {
     if (!dragState.current.id) return;
     const { id, snapCol, snapRow, hasMoved } = dragState.current;
     if (!hasMoved) {
-      setPopup({ taskId: id, screenX: e.clientX + 12, screenY: e.clientY - 10 });
+      const px = Math.min(e.clientX + 12, window.innerWidth - 280); const py = Math.max(10, e.clientY - 10); setPopup({ taskId: id, screenX: px, screenY: py });
     } else {
       setPositions(p => ({ ...p, [id]: { col: snapCol, row: snapRow } }));
     }
@@ -2794,18 +2794,24 @@ function HoneyDo({ userId, onSignOut }) {
             </div>
             {/* Mobile tab bar — full width second row */}
             {isMobile && (
-              <div style={{ width: "100%", display: "flex", justifyContent: "center", paddingBottom: 4 }}>
+              <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 4, paddingLeft: 4, paddingRight: 4 }}>
+                <button onClick={onSignOut} style={{
+                  background: "transparent", border: "1.5px solid #E8D0A0", borderRadius: 10,
+                  padding: "5px 10px", cursor: "pointer",
+                  fontFamily: "'Jost',sans-serif", fontWeight: 600, fontSize: 11, color: "#C4956A"
+                }}>Sign out</button>
                 <div style={{ display: "flex", background: HEX_COLOR, borderRadius: 12, padding: 3, border: "1.5px solid #E8D84A" }}>
                   {[["hive","Hive"],["list","List"],["garden","Garden"]].map(([v,label]) => (
                     <button key={v} onClick={() => { setTab(v); setSidebarOpen(false); }} style={{
                       background: tab === v ? WHITE : "transparent",
-                      border: "none", borderRadius: 9, padding: "6px 22px",
+                      border: "none", borderRadius: 9, padding: "6px 18px",
                       cursor: "pointer", fontWeight: 600, fontSize: 13, color: BROWN,
                       fontFamily: "'Jost',sans-serif", transition: "all 0.18s",
                       boxShadow: tab === v ? "0 1px 8px rgba(0,0,0,0.09)" : "none"
                     }}>{label}</button>
                   ))}
                 </div>
+                <div style={{ width: 70 }} />
               </div>
             )}
           </div>
@@ -3172,7 +3178,7 @@ function HoneyDo({ userId, onSignOut }) {
                   <svg
                     ref={svgRef}
                     width={SVG_W} height={SVG_H}
-                    style={{ display: "block", userSelect: "none", touchAction: "pan-x pan-y" }}
+                    style={{ display: "block", userSelect: "none", touchAction: "none" }}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
                     onPointerLeave={onPointerUp}
