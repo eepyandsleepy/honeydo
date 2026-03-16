@@ -29,7 +29,7 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react" data-plugins="transform-class-properties">
     const { useState, useEffect, useRef } = React;
 
     const firebaseApp = firebase.initializeApp({ apiKey: "AIzaSyCo248atCeEMcG-g-kda7px29XjLXldc5Q", authDomain: "honeydo-9dd1a.firebaseapp.com", databaseURL: "https://honeydo-9dd1a-default-rtdb.firebaseio.com", projectId: "honeydo-9dd1a", storageBucket: "honeydo-9dd1a.firebasestorage.app", messagingSenderId: "258140375145", appId: "1:258140375145:web:fb6253397999abd1393af8" });
