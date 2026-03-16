@@ -2592,7 +2592,7 @@ function HoneyDo({ userId, onSignOut }) {
       snapCol: pos.col, snapRow: pos.row,
       offX: px - cx, offY: py - cy,
       startScreenX: e.clientX, startScreenY: e.clientY,
-      hasMoved: false, rafPending: false,
+      hasMoved: false,
     };
 
     if (!isTouch) {
@@ -2643,22 +2643,14 @@ function HoneyDo({ userId, onSignOut }) {
     if (Math.hypot(dx, dy) > 6) ds.hasMoved = true;
 
     const occ  = buildOccMap(ds.id);
-    const snap = nearestCell(ghostX, ghostY, occ, ds.id);
+    const snap = nearestCell(ghostX, ghostY, occ, ds.id, GRID_COLS, GRID_ROWS);
 
     ds.ghostX  = ghostX;
     ds.ghostY  = ghostY;
     ds.snapCol = snap.col;
     ds.snapRow = snap.row;
 
-    // RAF throttle for smooth rendering
-    if (!ds.rafPending) {
-      ds.rafPending = true;
-      requestAnimationFrame(() => {
-        ds.rafPending = false;
-        if (!ds.id) return;
-        setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
-      });
-    }
+    setDragRender({ id: ds.id, ghostX, ghostY, snapCol: snap.col, snapRow: snap.row });
   };
 
   const onPointerUp = e => {
