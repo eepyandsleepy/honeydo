@@ -2774,6 +2774,11 @@ function HoneyDo({ userId, onSignOut }) {
                 padding: "6px 14px", cursor: "pointer",
                 fontFamily: "'Jost',sans-serif", fontWeight: 600, fontSize: 13, color: BROWN
               }}>Focus</button>}
+              {!isMobile && <button onClick={onSignOut} style={{
+                background: "transparent", border: "1.5px solid #E8D0A0", borderRadius: 12,
+                padding: "6px 12px", cursor: "pointer",
+                fontFamily: "'Jost',sans-serif", fontWeight: 600, fontSize: 12, color: "#C4956A"
+              }}>Sign out</button>}
 
               {!isMobile && <div style={{ display: "flex", background: HEX_COLOR, borderRadius: 12, padding: 3, border: "1.5px solid #E8D84A" }}>
                 {[["hive","Hive"],["list","List"],["garden","Garden"]].map(([v,label]) => (
