@@ -2570,41 +2570,70 @@ function HoneyDo({ userId, onSignOut }) {
   };
 
   // ── Pointer handlers ───────────────────────────────────────────────────────
+  const longPressTimer = useRef(null);
+
   const onPointerDown = (e, taskId) => {
-    e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    const isTouch = e.pointerType === "touch";
 
     const svg  = svgRef.current;
     const rect = svg.getBoundingClientRect();
     const px   = (e.clientX - rect.left) * (SVG_W / rect.width);
     const py   = (e.clientY - rect.top)  * (SVG_H / rect.height);
-
-    const pos = positions[taskId] || { col: 0, row: 0 };
+    const pos  = positions[taskId] || { col: 0, row: 0 };
     const { x: cx, y: cy } = cellCenter(pos.col, pos.row);
 
     dragState.current = {
-      id: taskId,
+      id: isTouch ? null : taskId,   // desktop: active immediately; mobile: wait for long press
+      pendingId: isTouch ? taskId : null,
+      pointerId: e.pointerId,
+      element: e.currentTarget,
       ghostX: cx, ghostY: cy,
       snapCol: pos.col, snapRow: pos.row,
       offX: px - cx, offY: py - cy,
       startScreenX: e.clientX, startScreenY: e.clientY,
-      hasMoved: false,
+      hasMoved: false, rafPending: false,
     };
-    setDragRender({ id: taskId, ghostX: cx, ghostY: cy, snapCol: pos.col, snapRow: pos.row });
+
+    if (!isTouch) {
+      // Desktop: instant drag
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setDragRender({ id: taskId, ghostX: cx, ghostY: cy, snapCol: pos.col, snapRow: pos.row });
+    } else {
+      // Mobile: long press to distinguish drag vs scroll
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = setTimeout(() => {
+        const ds = dragState.current;
+        if (!ds.pendingId || ds.hasMoved) return;
+        try { ds.element.setPointerCapture(ds.pointerId); } catch(err) {}
+        ds.id = ds.pendingId;
+        setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
+      }, 200);
+    }
   };
 
   const onPointerMove = e => {
     const ds = dragState.current;
+
+    // Track movement during long-press wait — cancel if user is scrolling
+    if (ds.pendingId && !ds.id) {
+      const dx = e.clientX - ds.startScreenX;
+      const dy = e.clientY - ds.startScreenY;
+      if (Math.hypot(dx, dy) > 8) {
+        ds.hasMoved = true;
+        clearTimeout(longPressTimer.current);
+      }
+      return;
+    }
+
     if (!ds.id) return;
     e.preventDefault();
 
     const svg  = svgRef.current;
     const rect = svg.getBoundingClientRect();
-    const scaleX = SVG_W / rect.width;
-    const scaleY = SVG_H / rect.height;
-    const px = (e.clientX - rect.left) * scaleX;
-    const py = (e.clientY - rect.top)  * scaleY;
+    const px   = (e.clientX - rect.left) * (SVG_W / rect.width);
+    const py   = (e.clientY - rect.top)  * (SVG_H / rect.height);
 
     const ghostX = px - ds.offX;
     const ghostY = py - ds.offY;
@@ -2621,16 +2650,34 @@ function HoneyDo({ userId, onSignOut }) {
     ds.snapCol = snap.col;
     ds.snapRow = snap.row;
 
-    setDragRender({ id: ds.id, ghostX, ghostY, snapCol: snap.col, snapRow: snap.row });
+    // RAF throttle for smooth rendering
+    if (!ds.rafPending) {
+      ds.rafPending = true;
+      requestAnimationFrame(() => {
+        ds.rafPending = false;
+        if (!ds.id) return;
+        setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
+      });
+    }
   };
 
   const onPointerUp = e => {
-    if (!dragState.current.id) return;
-    const { id, snapCol, snapRow, hasMoved } = dragState.current;
-    if (!hasMoved) {
-      const px = Math.min(e.clientX + 12, window.innerWidth - 280); const py = Math.max(10, e.clientY - 10); setPopup({ taskId: id, screenX: px, screenY: py });
-    } else {
-      setPositions(p => ({ ...p, [id]: { col: snapCol, row: snapRow } }));
+    clearTimeout(longPressTimer.current);
+    const ds = dragState.current;
+
+    if (ds.pendingId && !ds.id && !ds.hasMoved) {
+      // Short tap on mobile — open popup
+      const px = Math.min(e.clientX + 12, window.innerWidth - 280);
+      const py = Math.max(10, e.clientY - 10);
+      setPopup({ taskId: ds.pendingId, screenX: px, screenY: py });
+    } else if (ds.id) {
+      if (!ds.hasMoved) {
+        const px = Math.min(e.clientX + 12, window.innerWidth - 280);
+        const py = Math.max(10, e.clientY - 10);
+        setPopup({ taskId: ds.id, screenX: px, screenY: py });
+      } else {
+        setPositions(p => ({ ...p, [ds.id]: { col: ds.snapCol, row: ds.snapRow } }));
+      }
     }
     dragState.current = { id: null };
     setDragRender(null);
@@ -3171,14 +3218,14 @@ function HoneyDo({ userId, onSignOut }) {
                   </div>
                 ) : (
                   <div className="hive-scroll" style={{
-                    overflowX: "auto",
+                    overflowX: isMobile ? "auto" : "hidden",
                     overflowY: "visible",
                     WebkitOverflowScrolling: "touch",
                   }}>
                   <svg
                     ref={svgRef}
                     width={SVG_W} height={SVG_H}
-                    style={{ display: "block", userSelect: "none", touchAction: "none" }}
+                    style={{ display: "block", userSelect: "none", touchAction: isMobile ? "pan-x pan-y" : "none" }}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
                     onPointerLeave={onPointerUp}
