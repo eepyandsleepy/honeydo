@@ -2602,13 +2602,14 @@ function HoneyDo({ userId, onSignOut }) {
       setDragRender({ id: taskId, ghostX: cx, ghostY: cy, snapCol: pos.col, snapRow: pos.row });
     } else {
       clearTimeout(longPressTimer.current);
+      e.stopPropagation();
       longPressTimer.current = setTimeout(() => {
         const ds = dragState.current;
         if (!ds.pendingId || ds.hasMoved) return;
         try { ds.element.setPointerCapture(ds.pointerId); } catch(err) {}
         ds.id = ds.pendingId;
         setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
-      }, 200);
+      }, 120);
     }
   };
 
@@ -2640,7 +2641,7 @@ function HoneyDo({ userId, onSignOut }) {
     if (Math.hypot(dx, dy) > 6) ds.hasMoved = true;
 
     const occ  = buildOccMap(ds.id);
-    const snap = nearestCell(ghostX, ghostY, occ, ds.id);
+    const snap = nearestCell(ghostX, ghostY, occ, ds.id, GRID_COLS, GRID_ROWS);
 
     ds.ghostX  = ghostX;
     ds.ghostY  = ghostY;
