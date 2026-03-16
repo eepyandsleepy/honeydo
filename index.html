@@ -304,8 +304,8 @@ function hexPts(cx, cy, r) {
 
 function cellCenter(col, row) {
   return {
-    x: col * CS + (row % 2 === 1 ? OFF : 0) + HW / 2 + 30,
-    y: row * RS + S + 20,
+    x: col * CS + (row % 2 === 1 ? OFF : 0) + HW / 2 + 18,
+    y: row * RS + S + 18,
   };
 }
 
@@ -2675,7 +2675,7 @@ function HoneyDo({ userId, onSignOut }) {
   // SVG canvas size (dynamic based on task count)
   const GRID_COLS = 8;
   const GRID_ROWS = Math.max(4, Math.ceil(total / GRID_COLS) + 3);
-  const SVG_W = (GRID_COLS - 1) * CS + OFF + HW / 2 + S + 60;
+  const SVG_W = GRID_COLS * CS + OFF * 2 + 40;
   const SVG_H = GRID_ROWS * RS + HH + 40;
 
   const [newHiveIcon, setNewHiveIcon] = useState("hex");
