@@ -310,7 +310,7 @@ function cellCenter(col, row) {
 }
 
 // Find nearest grid cell to a pixel point, skipping occupied cells (except self)
-function nearestCell(px, py, posMap, selfId, cols = 9, rows = 14) {
+function nearestCell(px, py, posMap, selfId, cols = 8, rows = 14) {
   let best = { col: 0, row: 0 }, bestD = Infinity;
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
@@ -2682,8 +2682,8 @@ function HoneyDo({ userId, onSignOut }) {
 
   // SVG canvas size (dynamic based on task count)
   const GRID_COLS = 8;
-  const GRID_ROWS = Math.max(4, Math.ceil(total / GRID_COLS) + 3);
-  const SVG_W = GRID_COLS * CS + OFF * 2 + 40;
+  const GRID_ROWS = Math.max(5, Math.ceil(total / GRID_COLS) + 4);
+  const SVG_W = (GRID_COLS - 1) * CS + OFF + HW + 46;
   const SVG_H = GRID_ROWS * RS + HH + 10;
 
   const [newHiveIcon, setNewHiveIcon] = useState("hex");
