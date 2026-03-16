@@ -2608,8 +2608,16 @@ function HoneyDo({ userId, onSignOut }) {
         if (!ds.pendingId || ds.hasMoved) return;
         try { ds.element.setPointerCapture(ds.pointerId); } catch(err) {}
         ds.id = ds.pendingId;
+        // Visual pulse feedback — scale up briefly so user knows drag is ready
+        try {
+          ds.element.style.transition = "transform 0.15s ease";
+          ds.element.style.transform = "scale(1.18)";
+          setTimeout(() => {
+            if (ds.element) { ds.element.style.transform = ""; ds.element.style.transition = ""; }
+          }, 150);
+        } catch(err) {}
         setDragRender({ id: ds.id, ghostX: ds.ghostX, ghostY: ds.ghostY, snapCol: ds.snapCol, snapRow: ds.snapRow });
-      }, 120);
+      }, 400);
     }
   };
 
@@ -2619,7 +2627,7 @@ function HoneyDo({ userId, onSignOut }) {
     if (ds.pendingId && !ds.id) {
       const dx = e.clientX - ds.startScreenX;
       const dy = e.clientY - ds.startScreenY;
-      if (Math.hypot(dx, dy) > 8) { ds.hasMoved = true; clearTimeout(longPressTimer.current); }
+      if (Math.hypot(dx, dy) > 12) { ds.hasMoved = true; clearTimeout(longPressTimer.current); }
       return;
     }
 
@@ -3192,6 +3200,7 @@ function HoneyDo({ userId, onSignOut }) {
                 boxShadow: "0 2px 18px rgba(200,160,0,0.07)",
                 overflow: "hidden", position: "relative",
                 minHeight: isMobile ? 320 : undefined,
+                overflowX: "auto",
               }}>
                 {hiveTasks.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "80px 20px", color: BROWN_LIGHT }}>
@@ -3230,7 +3239,7 @@ function HoneyDo({ userId, onSignOut }) {
                           stroke={GOLD}
                           strokeWidth="2.5"
                           strokeDasharray="7 5"
-                          style={{ pointerEvents: "none", opacity: 0.7 }}
+                          style={{ pointerEvents: "none", opacity: 0.7, transition: "all 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94)" }}
                         />
                       );
                     })()}
