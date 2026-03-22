@@ -2377,31 +2377,41 @@ function HoneyDo({ userId, onSignOut }) {
   const pomRef = useRef();
   const pomIsBreakRef = useRef(pomIsBreak);
   useEffect(() => { pomIsBreakRef.current = pomIsBreak; }, [pomIsBreak]);
+  const pomStartTime = useRef(null);
+  const pomStartSecs = useRef(null);
   useEffect(() => {
-    if (pomRun) pomRef.current = setInterval(() => setPomSecs(s => {
-      if (s <= 1) {
-        clearInterval(pomRef.current);
-        setPomRun(false);
-        setPomDone(true);
-        try {
-          const ctx = new (window.AudioContext||window.webkitAudioContext)();
-          const o = ctx.createOscillator(); const g = ctx.createGain();
-          o.connect(g); g.connect(ctx.destination);
-          o.frequency.value = 528;
-          g.gain.setValueAtTime(0.3, ctx.currentTime);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+1.5);
-          o.start(); o.stop(ctx.currentTime+1.5);
-        } catch(e){}
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          const msg = pomIsBreakRef.current ? '🍯 Break over — back to it!' : '✦ Sweet session complete!';
-          const body = pomIsBreakRef.current ? 'Time to focus again.' : 'Take a well-earned break.';
-          setTimeout(() => { try { new Notification(msg, { body }); } catch(e){} }, 0);
+    if (pomRun) {
+      pomStartTime.current = Date.now();
+      pomStartSecs.current = pomSecs;
+      pomRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - pomStartTime.current) / 1000);
+        const remaining = pomStartSecs.current - elapsed;
+        if (remaining <= 0) {
+          clearInterval(pomRef.current);
+          setPomSecs(0);
+          setPomRun(false);
+          setPomDone(true);
+          try {
+            const ctx = new (window.AudioContext||window.webkitAudioContext)();
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = 528;
+            g.gain.setValueAtTime(0.3, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+1.5);
+            o.start(); o.stop(ctx.currentTime+1.5);
+          } catch(e){}
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const msg = pomIsBreakRef.current ? '🍯 Break over — back to it!' : '✦ Sweet session complete!';
+            const body = pomIsBreakRef.current ? 'Time to focus again.' : 'Take a well-earned break.';
+            setTimeout(() => { try { new Notification(msg, { body }); } catch(e){} }, 0);
+          }
+        } else {
+          setPomSecs(remaining);
         }
-        return 0;
-      }
-      return s-1;
-    }), 1000);
-    else clearInterval(pomRef.current);
+      }, 500);
+    } else {
+      clearInterval(pomRef.current);
+    }
     return () => clearInterval(pomRef.current);
   }, [pomRun]);
   useEffect(() => {
