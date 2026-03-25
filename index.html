@@ -2009,10 +2009,19 @@ function TodayTab({ tasks, hives, weeklyGoals, setWeeklyGoals, intentions, onTog
                 <input type="checkbox" checked={!!appSettings.numberedList} onChange={e => saveAppSettings({...appSettings, numberedList: e.target.checked})} style={{ accentColor: GOLD, width: 15, height: 15 }} />
                 <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Numbered list</span>
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 10 }}>
                 <input type="checkbox" checked={!!appSettings.timeBlocker} onChange={e => saveAppSettings({...appSettings, timeBlocker: e.target.checked})} style={{ accentColor: GOLD, width: 15, height: 15 }} />
                 <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Time Blocker tab</span>
               </label>
+              <div style={{ height: 1, background: "#F0E070", margin: "10px 0" }}/>
+              <div style={{ fontSize: 11, fontWeight: 700, color: BROWN_LIGHT, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontFamily: "'Jost',sans-serif" }}>Time Blocker</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Duration format</span>
+                <select value={appSettings.durFormat || "mixed"} onChange={e => saveAppSettings({...appSettings, durFormat: e.target.value})} style={{ border: `1px solid ${GOLD}`, borderRadius: 7, padding: "3px 8px", fontFamily: "'Jost',sans-serif", fontSize: 12, color: BROWN, background: PARCHMENT, outline: "none", marginLeft: "auto" }}>
+                  <option value="mixed">1h 30m</option>
+                  <option value="mins">90m</option>
+                </select>
+              </div>
             </div>
           )}
         </div>
@@ -3234,8 +3243,7 @@ function HoneyDo({ userId, onSignOut }) {
                 background: WHITE, borderRadius: 24, border: "1.5px solid #F0E070",
                 boxShadow: "0 2px 18px rgba(200,160,0,0.07)",
                 overflow: "hidden", position: "relative",
-                minHeight: isMobile ? 320 : undefined,
-                width: "100%",
+                width: "100%", borderRadius: 24,
               }}>
                 {hiveTasks.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "80px 20px", color: BROWN_LIGHT }}>
@@ -3251,8 +3259,8 @@ function HoneyDo({ userId, onSignOut }) {
                   </div>
                 ) : (
                   <div className="hive-scroll" style={{
-                    overflowX: isMobile ? "auto" : "hidden",
-                    overflowY: "visible",
+                    overflowX: "hidden",
+                    overflowY: "hidden",
                     WebkitOverflowScrolling: "touch",
                     display: "block",
                     background: "transparent",
@@ -3262,7 +3270,7 @@ function HoneyDo({ userId, onSignOut }) {
                   <svg
                     ref={svgRef}
                     width={SVG_W} height={SVG_H}
-                    style={{ display: "block", userSelect: "none", touchAction: "none", background: "transparent", width: "100%" }}
+                    style={{ display: "block", userSelect: "none", touchAction: "none", background: "transparent" }}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
                     onPointerLeave={onPointerUp}
@@ -3406,7 +3414,7 @@ function HoneyDo({ userId, onSignOut }) {
                   <span style={{ fontFamily: "'Dancing Script',cursive", fontSize: 22, fontWeight: 700, color: BROWN }}>Time Blocker</span>
                   <span style={{ fontSize: 11, color: BROWN_LIGHT, fontFamily: "'Jost',sans-serif" }}>Drag tasks to schedule your day</span>
                 </div>
-                <TimeBlocker tasks={tasks} hives={hives} onToggle={handleToggle} />
+                <TimeBlocker tasks={tasks} hives={hives} onToggle={handleToggle} durFormat={appSettings.durFormat || "mixed"} />
               </div>
             )}
 
@@ -3500,16 +3508,67 @@ function HoneyDo({ userId, onSignOut }) {
   );
 }
 // ─── Time Blocker ─────────────────────────────────────────────────────────────
-function TimeBlocker({ tasks }) {
+function TimeBlocker({ tasks, durFormat = "mixed" }) {
   const SLOT_MINS = 15;
   const [dayStart, setDayStart] = React.useState(() => { try { return parseInt(localStorage.getItem("hd4-tbStart") || "7"); } catch { return 7; } });
   const [dayEnd,   setDayEnd]   = React.useState(() => { try { return parseInt(localStorage.getItem("hd4-tbEnd")   || "22"); } catch { return 22; } });
   const [showDayPicker, setShowDayPicker] = React.useState(false);
   const [blocks, setBlocks] = React.useState(() => { try { return JSON.parse(localStorage.getItem("hd4-timeblocks") || "{}"); } catch { return {}; } });
+  // blocks[slot] = { taskId, duration } where duration = number of 15min slots
   const [dragTask, setDragTask] = React.useState(null);
   const [hoveredSlot, setHoveredSlot] = React.useState(null);
+  const [resizing, setResizing] = React.useState(null); // { slot, startY, origDur }
+  const touchDragTask = React.useRef(null);
+  const slotRefs = React.useRef({});
 
   const saveBlocks = b => { setBlocks(b); try { localStorage.setItem("hd4-timeblocks", JSON.stringify(b)); } catch {} };
+
+  // Resize handlers
+  const onResizeStart = (slot, e) => {
+    e.preventDefault(); e.stopPropagation();
+    const orig = blocks[slot];
+    if (!orig) return;
+    setResizing({ slot, startY: e.clientY, origDur: orig.duration || 1 });
+  };
+  React.useEffect(() => {
+    if (!resizing) return;
+    const onMove = e => {
+      const dy = e.clientY - resizing.startY;
+      const slotH = 30; // approx px per slot
+      const newDur = Math.max(1, Math.min(16, resizing.origDur + Math.round(dy / slotH)));
+      const nb = {...blocks};
+      if (nb[resizing.slot]) nb[resizing.slot] = {...nb[resizing.slot], duration: newDur};
+      setBlocks(nb);
+    };
+    const onUp = () => { saveBlocks(blocks); setResizing(null); };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+  }, [resizing, blocks]);
+
+  // Touch drag handlers
+  const onTouchStart = (t) => (e) => {
+    touchDragTask.current = t;
+    setDragTask(t);
+  };
+  const onTouchMove = (e) => {
+    if (!touchDragTask.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const slot = el && el.closest("[data-slot]") && el.closest("[data-slot]").getAttribute("data-slot");
+    setHoveredSlot(slot || null);
+  };
+  const onTouchEnd = (e) => {
+    if (!touchDragTask.current || !hoveredSlot) { touchDragTask.current = null; setDragTask(null); return; }
+    const nb = {...blocks};
+    Object.keys(nb).forEach(k => { if (nb[k]?.taskId === touchDragTask.current.id || nb[k] === touchDragTask.current.id) delete nb[k]; });
+    nb[hoveredSlot] = { taskId: touchDragTask.current.id, duration: 1 };
+    saveBlocks(nb);
+    touchDragTask.current = null;
+    setDragTask(null);
+    setHoveredSlot(null);
+  };
   const saveDayStart = v => { setDayStart(v); try { localStorage.setItem("hd4-tbStart", String(v)); } catch {} };
   const saveDayEnd   = v => { setDayEnd(v);   try { localStorage.setItem("hd4-tbEnd",   String(v)); } catch {} };
 
@@ -3534,7 +3593,7 @@ function TimeBlocker({ tasks }) {
   };
 
   const incompleteTasks = tasks.filter(t => !t.completed);
-  const assignedIds = new Set(Object.values(blocks));
+  const assignedIds = new Set(Object.values(blocks).map(v => v?.taskId || v));
   const unscheduled = incompleteTasks.filter(t => !assignedIds.has(t.id));
   const isHourSlot = key => key.endsWith(":00");
 
@@ -3576,34 +3635,89 @@ function TimeBlocker({ tasks }) {
           {unscheduled.map(t => (
             <div key={t.id} draggable
               onDragStart={() => setDragTask(t)}
-              onDragEnd={() => setDragTask(null)}
+              onDragEnd={() => { setDragTask(null); setHoveredSlot(null); }}
+              onTouchStart={onTouchStart(t)}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
               style={{
                 background: WHITE, border: `1.5px solid ${GOLD}`, borderRadius: 10,
                 padding: "6px 10px", marginBottom: 6, cursor: "grab",
                 fontSize: 11, fontWeight: 600, color: BROWN,
                 boxShadow: "0 1px 6px rgba(200,160,0,0.07)", userSelect: "none",
+                touchAction: "none",
               }}
             >{t.title}</div>
           ))}
         </div>
 
         {/* ── Schedule slots ── */}
-        <div style={{ flex: 1, minWidth: 0, maxHeight: 520, overflowY: "auto", paddingRight: 4 }}>
-          {slots.map(slot => {
-            const taskId = blocks[slot];
+        <div id="tb-scroll" style={{ flex: 1, minWidth: 0, maxHeight: 520, overflowY: "auto", paddingRight: 4 }}
+          onDragOver={e => {
+            const el = document.getElementById("tb-scroll");
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const threshold = 60;
+            if (e.clientY > rect.bottom - threshold) el.scrollTop += 2;
+            if (e.clientY < rect.top + threshold) el.scrollTop -= 2;
+          }}
+        >
+          {slots.map((slot, slotIdx) => {
+            const blockVal = blocks[slot];
+            const taskId = blockVal?.taskId || (typeof blockVal === "string" ? blockVal : null);
+            const duration = blockVal?.duration || 1;
             const task = tasks.find(t => t.id === taskId);
             const isHovered = hoveredSlot === slot;
             const isHour = isHourSlot(slot);
+            // Check if this slot is a continuation of a previous slot's task
+            const isContinuation = !blockVal && slots.slice(0, slotIdx).some((s, si) => {
+              const bv = blocks[s];
+              const bid = bv?.taskId || (typeof bv === "string" ? bv : null);
+              const bdur = bv?.duration || 1;
+              return bid && si + bdur > slotIdx;
+            });
+            const contTaskId = isContinuation ? (() => {
+              for (let si = slotIdx - 1; si >= 0; si--) {
+                const bv = blocks[slots[si]];
+                const bid = bv?.taskId || (typeof bv === "string" ? bv : null);
+                const bdur = bv?.duration || 1;
+                if (bid && si + bdur > slotIdx) return bid;
+              }
+              return null;
+            })() : null;
+            const contTask = contTaskId ? tasks.find(t => t.id === contTaskId) : null;
+            // Is this the last slot of a task block?
+            const isLastOfBlock = task && (() => {
+              const myIdx = slotIdx;
+              return myIdx + duration > slots.length || !slots[myIdx + duration] || true;
+            })();
+
+            if (isContinuation) {
+              return (
+                <div key={slot} data-slot={slot}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    minHeight: 28, borderRadius: 6, marginBottom: 2,
+                    background: "#FFFDE8",
+                    border: `1px solid #F5EDD0`,
+                    padding: "3px 10px",
+                  }}
+                >
+                  <span style={{ fontSize: 9, color: BROWN_LIGHT, minWidth: 58, flexShrink: 0, opacity: 0.4 }}>{fmt(slot)}</span>
+                </div>
+              );
+            }
+
             return (
               <div key={slot}
+                data-slot={slot}
                 onDragOver={e => { e.preventDefault(); setHoveredSlot(slot); }}
                 onDragLeave={() => setHoveredSlot(null)}
                 onDrop={e => {
                   e.preventDefault();
                   if (dragTask) {
                     const nb = {...blocks};
-                    Object.keys(nb).forEach(k => { if (nb[k] === dragTask.id) delete nb[k]; });
-                    nb[slot] = dragTask.id;
+                    Object.keys(nb).forEach(k => { if (nb[k]?.taskId === dragTask.id || nb[k] === dragTask.id) delete nb[k]; });
+                    nb[slot] = { taskId: dragTask.id, duration: 1 };
                     saveBlocks(nb);
                   }
                   setHoveredSlot(null);
@@ -3611,11 +3725,12 @@ function TimeBlocker({ tasks }) {
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   minHeight: isHour ? 34 : 28,
-                  borderRadius: isHour ? 9 : 6,
-                  marginBottom: 2,
-                  background: isHovered ? "#FFFCD4" : task ? "#FFFEF0" : "transparent",
+                  borderRadius: task && duration > 1 ? "9px 9px 0 0" : isHour ? 9 : 6,
+                  marginBottom: task && duration > 1 ? 0 : 2,
+                  background: isHovered ? "#FFF4A8" : task ? "#FFFCD4" : "transparent",
                   border: `1px solid ${isHovered ? GOLD : task ? "#F0E070" : isHour ? "#EDE4C8" : "#F5EFE0"}`,
-                  padding: "3px 10px",
+
+                  padding: "3px 10px 3px 8px",
                   transition: "all 0.1s",
                 }}
               >
@@ -3626,11 +3741,27 @@ function TimeBlocker({ tasks }) {
                 {task ? (
                   <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: BROWN }}>{task.title}</span>
-                    <button onClick={() => { const nb = {...blocks}; delete nb[slot]; saveBlocks(nb); }}
-                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: BROWN_LIGHT, opacity: 0.35, padding: 2 }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                      onMouseLeave={e => e.currentTarget.style.opacity = 0.35}
-                    >✕</button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontSize: 9, color: BROWN_LIGHT, opacity: 0.5 }}>{
+                        durFormat === "mins"
+                          ? `${duration * 15}m`
+                          : duration < 4
+                            ? `${duration * 15}m`
+                            : duration % 4 === 0
+                              ? `${duration / 4}h`
+                              : `${Math.floor(duration / 4)}h ${(duration % 4) * 15}m`
+                      }</span>
+                      <div
+                        onPointerDown={e => onResizeStart(slot, e)}
+                        style={{ cursor: "ns-resize", fontSize: 10, color: BROWN_LIGHT, opacity: 0.4, padding: "0 2px", userSelect: "none" }}
+                        title="Drag to resize"
+                      >↕</div>
+                      <button onClick={() => { const nb = {...blocks}; delete nb[slot]; saveBlocks(nb); }}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: BROWN_LIGHT, opacity: 0.35, padding: 2 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                        onMouseLeave={e => e.currentTarget.style.opacity = 0.35}
+                      >✕</button>
+                    </div>
                   </div>
                 ) : (
                   <span style={{ fontSize: 10, color: BROWN_LIGHT, opacity: 0.3, fontStyle: "italic" }}>
