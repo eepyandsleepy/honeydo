@@ -1564,7 +1564,7 @@ function Pomodoro({ onClose, workMins, setWorkMins, breakMins, setBreakMins, isB
 
 
 
-  const pct = ((totalSecs - secs) / totalSecs) * 100;
+  const pct = Math.min(100, Math.max(0, ((totalSecs - secs) / totalSecs) * 100));
   const mm = String(Math.floor(secs/60)).padStart(2,"0");
   const ss = String(secs%60).padStart(2,"0");
 
@@ -1768,7 +1768,7 @@ function HatShop({ pollen, unlocked, equipped, onUnlock, onToggleEquip, onClose 
 }
 
 // ─── List Row ─────────────────────────────────────────────────────────────────
-function ListRow({ task, onToggle, onDelete, onUpdate, onHandlePointerDown, isDragging, rowRef }) {
+function ListRow({ task, onToggle, onDelete, onUpdate, onHandlePointerDown, isDragging, rowRef, taskIndex, showNumbers }) {
   const done = task.completed;
   const [expanded, setExpanded] = useState(false);
   const hasTime = task.scheduledTime || task.scheduledDuration;
@@ -1790,7 +1790,7 @@ function ListRow({ task, onToggle, onDelete, onUpdate, onHandlePointerDown, isDr
     >
       {/* Main row */}
       <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px" }}>
-        <div onPointerDown={onHandlePointerDown} style={{ color: "#D4C090", fontSize: 13, cursor: "grab", flexShrink: 0, userSelect: "none", letterSpacing: 1, touchAction: "none" }}>⠿</div>
+        <div onPointerDown={onHandlePointerDown} style={{ color: "#D4C090", fontSize: showNumbers ? 12 : 13, cursor: "grab", flexShrink: 0, userSelect: "none", letterSpacing: showNumbers ? 0 : 1, touchAction: "none", fontFamily: "'Jost',sans-serif", fontWeight: showNumbers ? 700 : 400, minWidth: 18, textAlign: "center" }}>{showNumbers ? taskIndex : "⠿"}</div>
         <div onClick={() => onToggle(task.id)} style={{
           width:28, height:28, borderRadius:"50%", cursor:"pointer",
           background: done ? "#C4956A" : HEX_COLOR,
@@ -1851,7 +1851,7 @@ function ListRow({ task, onToggle, onDelete, onUpdate, onHandlePointerDown, isDr
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ─── TodayTab ────────────────────────────────────────────────────────────────
-function TodayTab({ tasks, hives, weeklyGoals, setWeeklyGoals, intentions, onToggle, onDelete, onAdd, onUpdate, activeHive, setPollen, onShowTimeChange, isMobile }) {
+function TodayTab({ tasks, hives, weeklyGoals, setWeeklyGoals, intentions, onToggle, onDelete, onAdd, onUpdate, activeHive, setPollen, onShowTimeChange, isMobile, appSettings, saveAppSettings }) {
   const today = new Date().toDateString();
   const todayIntention = intentions.find(i => i.date === today);
   const [newGoal, setNewGoal] = useState("");
@@ -1999,9 +1999,19 @@ function TodayTab({ tasks, hives, weeklyGoals, setWeeklyGoals, intentions, onTog
                 <input type="checkbox" checked={showTime} onChange={e => { setShowTime(e.target.checked); saveSettings(showCompleted, e.target.checked); if(onShowTimeChange) onShowTimeChange(e.target.checked); }} style={{ accentColor: GOLD, width: 15, height: 15 }} />
                 <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Show time in popup</span>
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 10 }}>
                 <input type="checkbox" checked={sendToBottom} onChange={e => { setSendToBottom(e.target.checked); saveSettings(showCompleted, showTime, e.target.checked); }} style={{ accentColor: GOLD, width: 15, height: 15 }} />
                 <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Send completed to bottom</span>
+              </label>
+              <div style={{ height: 1, background: "#F0E070", margin: "10px 0" }}/>
+              <div style={{ fontSize: 11, fontWeight: 700, color: BROWN_LIGHT, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontFamily: "'Jost',sans-serif" }}>Views</div>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 10 }}>
+                <input type="checkbox" checked={!!appSettings.numberedList} onChange={e => saveAppSettings({...appSettings, numberedList: e.target.checked})} style={{ accentColor: GOLD, width: 15, height: 15 }} />
+                <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Numbered list</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!appSettings.timeBlocker} onChange={e => saveAppSettings({...appSettings, timeBlocker: e.target.checked})} style={{ accentColor: GOLD, width: 15, height: 15 }} />
+                <span style={{ fontSize: 13, color: BROWN, fontFamily: "'Jost',sans-serif" }}>Time Blocker tab</span>
               </label>
             </div>
           )}
@@ -2079,6 +2089,8 @@ function TodayTab({ tasks, hives, weeklyGoals, setWeeklyGoals, intentions, onTog
                 isDragging={isDraggingId === t.id}
                 onHandlePointerDown={makeHandlePointerDown(t.id)}
                 rowRef={el => rowRefs.current[t.id] = el}
+                taskIndex={rows.length + 1}
+                showNumbers={!!(appSettings && appSettings.numberedList)}
               />
             );
           });
@@ -2352,6 +2364,13 @@ function HoneyDo({ userId, onSignOut }) {
   const [activeHive,  setActiveHive] = useState("personal");
   const [view,        setView]       = useState("grid");
   const [tab,         setTab]        = useState("hive");
+  const [appSettings, setAppSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("hd4-appSettings")) || {}; } catch { return {}; }
+  });
+  const saveAppSettings = (s) => {
+    setAppSettings(s);
+    try { localStorage.setItem("hd4-appSettings", JSON.stringify(s)); } catch {}
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile,    setIsMobile]    = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   useEffect(() => {
@@ -2841,7 +2860,7 @@ function HoneyDo({ userId, onSignOut }) {
               }}>Sign out</button>}
 
               {!isMobile && <div style={{ display: "flex", background: HEX_COLOR, borderRadius: 12, padding: 3, border: "1.5px solid #E8D84A" }}>
-                {[["hive","Hive"],["list","List"],["garden","Garden"]].map(([v,label]) => (
+                {[["hive","Hive"],["list","List"],["garden","Garden"],...(appSettings.timeBlocker ? [["blocker","⏱ Time"]] : [])].map(([v,label]) => (
                   <button key={v} onClick={() => { setTab(v); setSidebarOpen(false); }} style={{
                     background: tab === v ? WHITE : "transparent",
                     border: "none", borderRadius: 9, padding: "5px 13px",
@@ -2861,7 +2880,7 @@ function HoneyDo({ userId, onSignOut }) {
                   fontFamily: "'Jost',sans-serif", fontWeight: 600, fontSize: 11, color: "#C4956A"
                 }}>Sign out</button>
                 <div style={{ display: "flex", background: HEX_COLOR, borderRadius: 12, padding: 3, border: "1.5px solid #E8D84A" }}>
-                  {[["hive","Hive"],["list","List"],["garden","Garden"]].map(([v,label]) => (
+                  {[["hive","Hive"],["list","List"],["garden","Garden"],...(appSettings.timeBlocker ? [["blocker","⏱"]] : [])].map(([v,label]) => (
                     <button key={v} onClick={() => { setTab(v); setSidebarOpen(false); }} style={{
                       background: tab === v ? WHITE : "transparent",
                       border: "none", borderRadius: 9, padding: "6px 18px",
@@ -3373,12 +3392,24 @@ function HoneyDo({ userId, onSignOut }) {
                 setPollen={setPollen}
                 onShowTimeChange={v => { setShowTimeInPopup(v); }}
                 isMobile={isMobile}
+                appSettings={appSettings}
+                saveAppSettings={saveAppSettings}
               />
             )}
 
             {/* ══════════════════════════════════════════════════════
                 GARDEN TAB
             ══════════════════════════════════════════════════════ */}
+            {tab === "blocker" && appSettings.timeBlocker && (
+              <div style={{ background: WHITE, borderRadius: 24, border: "1.5px solid #F0E070", boxShadow: "0 2px 18px rgba(200,160,0,0.07)", padding: "20px 24px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+                  <span style={{ fontFamily: "'Dancing Script',cursive", fontSize: 22, fontWeight: 700, color: BROWN }}>Time Blocker</span>
+                  <span style={{ fontSize: 11, color: BROWN_LIGHT, fontFamily: "'Jost',sans-serif" }}>Drag tasks to schedule your day</span>
+                </div>
+                <TimeBlocker tasks={tasks} hives={hives} onToggle={handleToggle} />
+              </div>
+            )}
+
             {tab === "garden" && (
               <GardenTab
                 habits={habits}
@@ -3468,6 +3499,153 @@ function HoneyDo({ userId, onSignOut }) {
     </>
   );
 }
+// ─── Time Blocker ─────────────────────────────────────────────────────────────
+function TimeBlocker({ tasks }) {
+  const SLOT_MINS = 15;
+  const [dayStart, setDayStart] = React.useState(() => { try { return parseInt(localStorage.getItem("hd4-tbStart") || "7"); } catch { return 7; } });
+  const [dayEnd,   setDayEnd]   = React.useState(() => { try { return parseInt(localStorage.getItem("hd4-tbEnd")   || "22"); } catch { return 22; } });
+  const [showDayPicker, setShowDayPicker] = React.useState(false);
+  const [blocks, setBlocks] = React.useState(() => { try { return JSON.parse(localStorage.getItem("hd4-timeblocks") || "{}"); } catch { return {}; } });
+  const [dragTask, setDragTask] = React.useState(null);
+  const [hoveredSlot, setHoveredSlot] = React.useState(null);
+
+  const saveBlocks = b => { setBlocks(b); try { localStorage.setItem("hd4-timeblocks", JSON.stringify(b)); } catch {} };
+  const saveDayStart = v => { setDayStart(v); try { localStorage.setItem("hd4-tbStart", String(v)); } catch {} };
+  const saveDayEnd   = v => { setDayEnd(v);   try { localStorage.setItem("hd4-tbEnd",   String(v)); } catch {} };
+
+  // Generate slots: e.g. "7:00", "7:15", "7:30", "7:45", "8:00" ...
+  const slots = [];
+  for (let h = dayStart; h < dayEnd; h++) {
+    for (let m = 0; m < 60; m += SLOT_MINS) {
+      slots.push(`${h}:${String(m).padStart(2,"0")}`);
+    }
+  }
+
+  const fmt = key => {
+    const [h, m] = key.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hr = h % 12 || 12;
+    return `${hr}:${String(m).padStart(2,"0")} ${ampm}`;
+  };
+
+  const fmtHour = h => {
+    const ampm = h >= 12 ? "PM" : "AM";
+    return `${h % 12 || 12} ${ampm}`;
+  };
+
+  const incompleteTasks = tasks.filter(t => !t.completed);
+  const assignedIds = new Set(Object.values(blocks));
+  const unscheduled = incompleteTasks.filter(t => !assignedIds.has(t.id));
+  const isHourSlot = key => key.endsWith(":00");
+
+  return (
+    <div style={{ fontFamily: "'Jost',sans-serif" }}>
+
+      {/* ── Day range picker ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <button onClick={() => setShowDayPicker(s => !s)} style={{
+          background: "none", border: `1.5px solid ${GOLD}`, borderRadius: 10,
+          padding: "4px 12px", cursor: "pointer", fontSize: 11, fontWeight: 700,
+          color: BROWN, fontFamily: "'Jost',sans-serif", display: "flex", alignItems: "center", gap: 6,
+        }}>
+          ⏰ {fmtHour(dayStart)} — {fmtHour(dayEnd)}
+        </button>
+        {showDayPicker && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: WHITE, border: `1.5px solid ${GOLD}`, borderRadius: 12, padding: "8px 14px" }}>
+            <span style={{ fontSize: 11, color: BROWN_LIGHT, fontWeight: 700 }}>Start</span>
+            <select value={dayStart} onChange={e => saveDayStart(Number(e.target.value))} style={{ border: `1px solid ${GOLD}`, borderRadius: 7, padding: "3px 6px", fontFamily: "'Jost',sans-serif", fontSize: 12, color: BROWN, background: PARCHMENT, outline: "none" }}>
+              {Array.from({length: 24}, (_, i) => <option key={i} value={i}>{fmtHour(i)}</option>)}
+            </select>
+            <span style={{ fontSize: 11, color: BROWN_LIGHT, fontWeight: 700 }}>End</span>
+            <select value={dayEnd} onChange={e => saveDayEnd(Number(e.target.value))} style={{ border: `1px solid ${GOLD}`, borderRadius: 7, padding: "3px 6px", fontFamily: "'Jost',sans-serif", fontSize: 12, color: BROWN, background: PARCHMENT, outline: "none" }}>
+              {Array.from({length: 24}, (_, i) => <option key={i} value={i}>{fmtHour(i)}</option>)}
+            </select>
+            <button onClick={() => setShowDayPicker(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: BROWN_LIGHT }}>✕</button>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+
+        {/* ── Unscheduled tasks ── */}
+        <div style={{ minWidth: 150, flex: "0 0 150px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: BROWN_LIGHT, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Unscheduled</div>
+          {unscheduled.length === 0 && (
+            <div style={{ fontSize: 11, color: BROWN_LIGHT, fontStyle: "italic", opacity: 0.6 }}>All scheduled ✦</div>
+          )}
+          {unscheduled.map(t => (
+            <div key={t.id} draggable
+              onDragStart={() => setDragTask(t)}
+              onDragEnd={() => setDragTask(null)}
+              style={{
+                background: WHITE, border: `1.5px solid ${GOLD}`, borderRadius: 10,
+                padding: "6px 10px", marginBottom: 6, cursor: "grab",
+                fontSize: 11, fontWeight: 600, color: BROWN,
+                boxShadow: "0 1px 6px rgba(200,160,0,0.07)", userSelect: "none",
+              }}
+            >{t.title}</div>
+          ))}
+        </div>
+
+        {/* ── Schedule slots ── */}
+        <div style={{ flex: 1, minWidth: 0, maxHeight: 520, overflowY: "auto", paddingRight: 4 }}>
+          {slots.map(slot => {
+            const taskId = blocks[slot];
+            const task = tasks.find(t => t.id === taskId);
+            const isHovered = hoveredSlot === slot;
+            const isHour = isHourSlot(slot);
+            return (
+              <div key={slot}
+                onDragOver={e => { e.preventDefault(); setHoveredSlot(slot); }}
+                onDragLeave={() => setHoveredSlot(null)}
+                onDrop={e => {
+                  e.preventDefault();
+                  if (dragTask) {
+                    const nb = {...blocks};
+                    Object.keys(nb).forEach(k => { if (nb[k] === dragTask.id) delete nb[k]; });
+                    nb[slot] = dragTask.id;
+                    saveBlocks(nb);
+                  }
+                  setHoveredSlot(null);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  minHeight: isHour ? 34 : 28,
+                  borderRadius: isHour ? 9 : 6,
+                  marginBottom: 2,
+                  background: isHovered ? "#FFFCD4" : task ? "#FFFEF0" : "transparent",
+                  border: `1px solid ${isHovered ? GOLD : task ? "#F0E070" : isHour ? "#EDE4C8" : "#F5EFE0"}`,
+                  padding: "3px 10px",
+                  transition: "all 0.1s",
+                }}
+              >
+                <span style={{
+                  fontSize: isHour ? 11 : 9, color: BROWN_LIGHT, fontWeight: isHour ? 700 : 400,
+                  minWidth: 58, flexShrink: 0, opacity: isHour ? 0.9 : 0.5,
+                }}>{fmt(slot)}</span>
+                {task ? (
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: BROWN }}>{task.title}</span>
+                    <button onClick={() => { const nb = {...blocks}; delete nb[slot]; saveBlocks(nb); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: BROWN_LIGHT, opacity: 0.35, padding: 2 }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                      onMouseLeave={e => e.currentTarget.style.opacity = 0.35}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 10, color: BROWN_LIGHT, opacity: 0.3, fontStyle: "italic" }}>
+                    {isHovered ? "Drop here ✦" : ""}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
     let _mounted = false;
     function mount() { if (_mounted) return; _mounted = true; ReactDOM.createRoot(document.getElementById("root")).render(<App />); }
     mount();
