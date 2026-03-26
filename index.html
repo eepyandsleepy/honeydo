@@ -2395,9 +2395,9 @@ function HoneyDo({ userId, onSignOut }) {
   const [positions,   setPositions]  = useState(() => load("hd4-pos",      {}));
   const [showAdd,     setShowAdd]    = useState(false);
   const [showPom,     setShowPom]    = useState(false);
-  const [tbBlocks,    setTbBlocks]   = useState(() => { try { return JSON.parse(localStorage.getItem("hd4-timeblocks") || "{}"); } catch { return {}; } });
-  const [tbDayStart,  setTbDayStart] = useState(() => { try { return parseInt(localStorage.getItem("hd4-tbStart") || "7"); } catch { return 7; } });
-  const [tbDayEnd,    setTbDayEnd]   = useState(() => { try { return parseInt(localStorage.getItem("hd4-tbEnd") || "22"); } catch { return 22; } });
+  const [tbBlocks,    setTbBlocks]   = useState({});
+  const [tbDayStart,  setTbDayStart] = useState(7);
+  const [tbDayEnd,    setTbDayEnd]   = useState(22);
   // Pomodoro state lives here so timer keeps running when popup is closed
   const [pomWorkMins,  setPomWorkMins]  = useState(() => { try { return JSON.parse(sessionStorage.getItem('hd-pom')||'null')?.workMins||25; } catch{return 25;} });
   const [pomBreakMins, setPomBreakMins] = useState(() => { try { return JSON.parse(sessionStorage.getItem('hd-pom')||'null')?.breakMins||5; } catch{return 5;} });
@@ -2501,7 +2501,7 @@ function HoneyDo({ userId, onSignOut }) {
     window.hdSubscribe("hd4-unlocked",  v => { if(Array.isArray(v)) setUnlocked(v); });
     window.hdSubscribe("hd4-hat",       v => { if(v) setEquippedHats(Array.isArray(v) ? v : [v]); });
     window.hdSubscribe("hd4-intention", v => { if(Array.isArray(v)) setIntentions(v); });
-    window.hdSubscribe("hd4-timeblocks", v => { if(v && typeof v === "object") setTbBlocks(v); });
+    window.hdSubscribe("hd4-timeblocks", v => { if(v !== null && v !== undefined) setTbBlocks(typeof v === "object" ? v : {}); });
     window.hdSubscribe("hd4-tbStart",   v => { if(typeof v === "number") setTbDayStart(v); });
     window.hdSubscribe("hd4-tbEnd",     v => { if(typeof v === "number") setTbDayEnd(v); });
     return () => {
