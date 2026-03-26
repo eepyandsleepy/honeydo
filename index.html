@@ -2395,6 +2395,9 @@ function HoneyDo({ userId, onSignOut }) {
   const [positions,   setPositions]  = useState(() => load("hd4-pos",      {}));
   const [showAdd,     setShowAdd]    = useState(false);
   const [showPom,     setShowPom]    = useState(false);
+  const [tbBlocks,    setTbBlocks]   = useState(() => { try { return JSON.parse(localStorage.getItem("hd4-timeblocks") || "{}"); } catch { return {}; } });
+  const [tbDayStart,  setTbDayStart] = useState(() => { try { return parseInt(localStorage.getItem("hd4-tbStart") || "7"); } catch { return 7; } });
+  const [tbDayEnd,    setTbDayEnd]   = useState(() => { try { return parseInt(localStorage.getItem("hd4-tbEnd") || "22"); } catch { return 22; } });
   // Pomodoro state lives here so timer keeps running when popup is closed
   const [pomWorkMins,  setPomWorkMins]  = useState(() => { try { return JSON.parse(sessionStorage.getItem('hd-pom')||'null')?.workMins||25; } catch{return 25;} });
   const [pomBreakMins, setPomBreakMins] = useState(() => { try { return JSON.parse(sessionStorage.getItem('hd-pom')||'null')?.breakMins||5; } catch{return 5;} });
@@ -2484,6 +2487,9 @@ function HoneyDo({ userId, onSignOut }) {
   useEffect(() => { _save("hd4-weekly",    weeklyGoals);   }, [weeklyGoals]);
   useEffect(() => { _save("hd4-habits",    habits);        }, [habits]);
   useEffect(() => { _save("hd4-dreams",    dreams);        }, [dreams]);
+  useEffect(() => { _save("hd4-timeblocks", tbBlocks);    }, [tbBlocks]);
+  useEffect(() => { _save("hd4-tbStart",   tbDayStart);   }, [tbDayStart]);
+  useEffect(() => { _save("hd4-tbEnd",     tbDayEnd);     }, [tbDayEnd]);
 
   // ── Firebase live sync — update state when another device changes data ──
   useEffect(() => {
@@ -2495,6 +2501,9 @@ function HoneyDo({ userId, onSignOut }) {
     window.hdSubscribe("hd4-unlocked",  v => { if(Array.isArray(v)) setUnlocked(v); });
     window.hdSubscribe("hd4-hat",       v => { if(v) setEquippedHats(Array.isArray(v) ? v : [v]); });
     window.hdSubscribe("hd4-intention", v => { if(Array.isArray(v)) setIntentions(v); });
+    window.hdSubscribe("hd4-timeblocks", v => { if(v && typeof v === "object") setTbBlocks(v); });
+    window.hdSubscribe("hd4-tbStart",   v => { if(typeof v === "number") setTbDayStart(v); });
+    window.hdSubscribe("hd4-tbEnd",     v => { if(typeof v === "number") setTbDayEnd(v); });
     return () => {
       ["hd4-tasks","hd4-hives","hd4-pos","hd4-pollen","hd4-unlocked","hd4-hat","hd4-intention"]
         .forEach(k => window.hdUnsubscribe && window.hdUnsubscribe(k));
@@ -3414,7 +3423,13 @@ function HoneyDo({ userId, onSignOut }) {
                   <span style={{ fontFamily: "'Dancing Script',cursive", fontSize: 22, fontWeight: 700, color: BROWN }}>Time Blocker</span>
                   <span style={{ fontSize: 11, color: BROWN_LIGHT, fontFamily: "'Jost',sans-serif" }}>Drag tasks to schedule your day</span>
                 </div>
-                <TimeBlocker tasks={tasks} hives={hives} onToggle={handleToggle} durFormat={appSettings.durFormat || "mixed"} />
+                <TimeBlocker
+                tasks={tasks} hives={hives} onToggle={handleToggle}
+                durFormat={appSettings.durFormat || "mixed"}
+                blocks={tbBlocks} setBlocks={setTbBlocks}
+                dayStart={tbDayStart} setDayStart={setTbDayStart}
+                dayEnd={tbDayEnd} setDayEnd={setTbDayEnd}
+              />
               </div>
             )}
 
@@ -3508,12 +3523,9 @@ function HoneyDo({ userId, onSignOut }) {
   );
 }
 // ─── Time Blocker ─────────────────────────────────────────────────────────────
-function TimeBlocker({ tasks, durFormat = "mixed" }) {
+function TimeBlocker({ tasks, durFormat = "mixed", blocks, setBlocks, dayStart, setDayStart, dayEnd, setDayEnd }) {
   const SLOT_MINS = 15;
-  const [dayStart, setDayStart] = React.useState(() => { try { return parseInt(localStorage.getItem("hd4-tbStart") || "7"); } catch { return 7; } });
-  const [dayEnd,   setDayEnd]   = React.useState(() => { try { return parseInt(localStorage.getItem("hd4-tbEnd")   || "22"); } catch { return 22; } });
   const [showDayPicker, setShowDayPicker] = React.useState(false);
-  const [blocks, setBlocks] = React.useState(() => { try { return JSON.parse(localStorage.getItem("hd4-timeblocks") || "{}"); } catch { return {}; } });
   // blocks[slot] = { taskId, duration } where duration = number of 15min slots
   const [dragTask, setDragTask] = React.useState(null);
   const [hoveredSlot, setHoveredSlot] = React.useState(null);
@@ -3521,7 +3533,7 @@ function TimeBlocker({ tasks, durFormat = "mixed" }) {
   const touchDragTask = React.useRef(null);
   const slotRefs = React.useRef({});
 
-  const saveBlocks = b => { setBlocks(b); try { localStorage.setItem("hd4-timeblocks", JSON.stringify(b)); } catch {} };
+  const saveBlocks = b => setBlocks(b);
 
   // Resize handlers
   const onResizeStart = (slot, e) => {
@@ -3569,8 +3581,8 @@ function TimeBlocker({ tasks, durFormat = "mixed" }) {
     setDragTask(null);
     setHoveredSlot(null);
   };
-  const saveDayStart = v => { setDayStart(v); try { localStorage.setItem("hd4-tbStart", String(v)); } catch {} };
-  const saveDayEnd   = v => { setDayEnd(v);   try { localStorage.setItem("hd4-tbEnd",   String(v)); } catch {} };
+  const saveDayStart = v => setDayStart(v);
+  const saveDayEnd   = v => setDayEnd(v);
 
   // Generate slots: e.g. "7:00", "7:15", "7:30", "7:45", "8:00" ...
   const slots = [];
