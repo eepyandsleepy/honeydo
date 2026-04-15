@@ -2395,9 +2395,9 @@ function HoneyDo({ userId, onSignOut }) {
   const [positions,   setPositions]  = useState(() => load("hd4-pos",      {}));
   const [showAdd,     setShowAdd]    = useState(false);
   const [showPom,     setShowPom]    = useState(false);
-  const [tbBlocks,    setTbBlocks]   = useState({});
-  const [tbDayStart,  setTbDayStart] = useState(7);
-  const [tbDayEnd,    setTbDayEnd]   = useState(22);
+  const [tbBlocks,    setTbBlocks]   = useState(() => load("hd4-timeblocks", {}));
+  const [tbDayStart,  setTbDayStart] = useState(() => { const v = load("hd4-tbStart", 7); return typeof v === "number" ? v : 7; });
+  const [tbDayEnd,    setTbDayEnd]   = useState(() => { const v = load("hd4-tbEnd", 22); return typeof v === "number" ? v : 22; });
   // Pomodoro state lives here so timer keeps running when popup is closed
   const [pomWorkMins,  setPomWorkMins]  = useState(() => { try { return JSON.parse(sessionStorage.getItem('hd-pom')||'null')?.workMins||25; } catch{return 25;} });
   const [pomBreakMins, setPomBreakMins] = useState(() => { try { return JSON.parse(sessionStorage.getItem('hd-pom')||'null')?.breakMins||5; } catch{return 5;} });
